@@ -92,12 +92,8 @@
   <div id="sec-registro" class="section active">
     <div class="form-grid">
       <div class="form-group" style="grid-column:1/-1">
-        <label>Perfil / Usuario</label>
-        <select id="ej-usuario">
-          <option value="Mi Perfil">Mi Perfil</option>
-          <option value="Invitado 1">Invitado 1</option>
-          <option value="Invitado 2">Invitado 2</option>
-        </select>
+        <label>Tu Nombre / Perfil</label>
+        <input type="text" id="ej-usuario" placeholder="Ej: Mi Perfil" value="Mi Perfil">
       </div>
 
       <div class="form-group" style="grid-column:1/-1">
@@ -196,8 +192,8 @@
     }
   });
 
-  // Al cambiar el usuario, refrescamos historial y estadísticas
-  document.getElementById('ej-usuario').addEventListener('change', () => {
+  // Al escribir el nombre, refrescamos historial y estadísticas automáticamente
+  document.getElementById('ej-usuario').addEventListener('input', () => {
     if(document.getElementById('sec-historial').classList.contains('active')) renderHistorial();
     if(document.getElementById('sec-stats').classList.contains('active')) renderStats();
   });
@@ -217,7 +213,7 @@
   }
  
   async function agregarEjercicio(){
-    const usuario = document.getElementById('ej-usuario').value;
+    const usuario = document.getElementById('ej-usuario').value.trim() || "Anónimo";
     const nombre = getEjNombre();
     const peso = parseFloat(document.getElementById('ej-peso').value)||0;
     const reps = parseInt(document.getElementById('ej-reps').value)||0;
@@ -252,7 +248,7 @@
     btn.textContent = "Enviando a Drive...";
     
     const formData = new FormData();
-    formData.append('usuario', usuario); // Campo nuevo para Google
+    formData.append('usuario', usuario);
     formData.append('ejercicio', nombre);
     formData.append('peso', peso);
     formData.append('reps', reps);
@@ -312,15 +308,14 @@
  
   function renderHistorial(){
     const list = document.getElementById('log-list');
-    const usuarioActual = document.getElementById('ej-usuario').value;
+    const usuarioActual = document.getElementById('ej-usuario').value.trim();
     
-    // Filtramos primero por usuario activo y luego por grupo muscular
     let data = records.filter(r => r.usuario === usuarioActual);
     if(filtroActivo !== 'Todos') {
       data = data.filter(r => r.grupo === filtroActivo);
     }
 
-    if(!data.length){list.innerHTML=`<div class="empty">Sin registros para ${usuarioActual}.</div>`;return}
+    if(!data.length){list.innerHTML=`<div class="empty">Sin registros para "${usuarioActual}".</div>`;return}
     
     list.innerHTML = data.map(r=>`
       <div class="log-item">
@@ -345,7 +340,7 @@
   }
  
   function renderStats(){
-    const usuarioActual = document.getElementById('ej-usuario').value;
+    const usuarioActual = document.getElementById('ej-usuario').value.trim();
     const userRecords = records.filter(r => r.usuario === usuarioActual);
 
     const total = userRecords.length;
