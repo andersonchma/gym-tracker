@@ -92,6 +92,15 @@
   <div id="sec-registro" class="section active">
     <div class="form-grid">
       <div class="form-group" style="grid-column:1/-1">
+        <label>Perfil / Usuario</label>
+        <select id="ej-usuario">
+          <option value="Mi Perfil">Mi Perfil</option>
+          <option value="Invitado 1">Invitado 1</option>
+          <option value="Invitado 2">Invitado 2</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="grid-column:1/-1">
         <label>Ejercicio</label>
         <select id="ej-tipo" name="ejercicio">
           <option value="">Seleccionar ejercicio...</option>
@@ -165,7 +174,6 @@
 </div>
  
 <script>
-  // PEGA AQUÍ TU URL DE GOOGLE APPS SCRIPT
   const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbxxtiLAMhiHcKLHMphpRuiFXGTMCBL8C4dQZxTfi3IQZtlEj_jZ4lCGnPlPLTFXyPBB/exec";
 
   const ICONS = {Pecho:'💪',Espalda:'🔙',Hombros:'🔺',Piernas:'🦵',Brazos:'💪',Core:'⭕',Cardio:'🏃'};
@@ -187,6 +195,12 @@
       if(g) document.getElementById('ej-grupo').value = g;
     }
   });
+
+  // Al cambiar el usuario, refrescamos historial y estadísticas
+  document.getElementById('ej-usuario').addEventListener('change', () => {
+    if(document.getElementById('sec-historial').classList.contains('active')) renderHistorial();
+    if(document.getElementById('sec-stats').classList.contains('active')) renderStats();
+  });
  
   function switchTab(t, btn){
     document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
@@ -203,6 +217,7 @@
   }
  
   async function agregarEjercicio(){
+    const usuario = document.getElementById('ej-usuario').value;
     const nombre = getEjNombre();
     const peso = parseFloat(document.getElementById('ej-peso').value)||0;
     const reps = parseInt(document.getElementById('ej-reps').value)||0;
@@ -216,21 +231,28 @@
     if(reps<1){fb.textContent='Ingresa las repeticiones';fb.style.color='#E24B4A';return}
  
     const now = new Date();
-    const entry = {id:Date.now(),nombre,peso,reps,series,grupo,notas,
-      fecha:now.toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'2-digit'}),
-      ts:now.getTime()};
+    const entry = {
+      id: Date.now(),
+      usuario, 
+      nombre,
+      peso,
+      reps,
+      series,
+      grupo,
+      notas,
+      fecha: now.toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'2-digit'}),
+      ts: now.getTime()
+    };
  
-    // 1. Guardar localmente (como ya lo hacías)
-    const prAntes = getPR(nombre);
+    const prAntes = getPR(nombre, usuario);
     records.unshift(entry);
     guardar();
     
-    // 2. Enviar a Google Sheets
     btn.disabled = true;
     btn.textContent = "Enviando a Drive...";
     
-    // Preparamos los datos para Google
     const formData = new FormData();
+    formData.append('usuario', usuario); // Campo nuevo para Google
     formData.append('ejercicio', nombre);
     formData.append('peso', peso);
     formData.append('reps', reps);
@@ -251,7 +273,6 @@
     btn.disabled = false;
     btn.textContent = "+ Registrar ejercicio";
  
-    // Limpiar formulario
     document.getElementById('ej-tipo').value='';
     document.getElementById('ej-custom').value='';
     document.getElementById('custom-wrap').style.display='none';
@@ -262,13 +283,20 @@
     setTimeout(()=>{fb.textContent=''},4000);
   }
  
-  function getPR(nombre){
-    return Math.max(0,...records.filter(r=>r.nombre===nombre && r.peso>0).map(r=>r.peso));
+  function getPR(nombre, usuario){
+    const filtered = records.filter(r => r.nombre === nombre && r.usuario === usuario && r.peso > 0);
+    return filtered.length > 0 ? Math.max(...filtered.map(r => r.peso)) : 0;
   }
  
   function isPR(entry){
-    const others = records.filter(r=>r.nombre===entry.nombre && r.peso>0 && r.ts!==entry.ts && r.ts>entry.ts);
-    return entry.peso>0 && others.length===0 && getPR(entry.nombre)===entry.peso;
+    const others = records.filter(r => 
+      r.nombre === entry.nombre && 
+      r.usuario === entry.usuario && 
+      r.peso > 0 && 
+      r.ts !== entry.ts && 
+      r.ts > entry.ts
+    );
+    return entry.peso > 0 && others.length === 0 && getPR(entry.nombre, entry.usuario) === entry.peso;
   }
  
   function guardar(){
@@ -284,8 +312,16 @@
  
   function renderHistorial(){
     const list = document.getElementById('log-list');
-    const data = filtroActivo==='Todos' ? records : records.filter(r=>r.grupo===filtroActivo);
-    if(!data.length){list.innerHTML='<div class="empty">Sin registros para este filtro.</div>';return}
+    const usuarioActual = document.getElementById('ej-usuario').value;
+    
+    // Filtramos primero por usuario activo y luego por grupo muscular
+    let data = records.filter(r => r.usuario === usuarioActual);
+    if(filtroActivo !== 'Todos') {
+      data = data.filter(r => r.grupo === filtroActivo);
+    }
+
+    if(!data.length){list.innerHTML=`<div class="empty">Sin registros para ${usuarioActual}.</div>`;return}
+    
     list.innerHTML = data.map(r=>`
       <div class="log-item">
         <div class="log-icon" style="background:${COLORS[r.grupo]||'#888'}22">${ICONS[r.grupo]||'⚡'}</div>
@@ -309,14 +345,17 @@
   }
  
   function renderStats(){
-    const total = records.length;
-    const vol = records.reduce((a,r)=>a+(r.peso*r.reps*r.series),0);
+    const usuarioActual = document.getElementById('ej-usuario').value;
+    const userRecords = records.filter(r => r.usuario === usuarioActual);
+
+    const total = userRecords.length;
+    const vol = userRecords.reduce((a,r)=>a+(r.peso*r.reps*r.series),0);
     document.getElementById('s-total').textContent=total;
     document.getElementById('s-vol').textContent=vol>=1000?(vol/1000).toFixed(1)+'k':Math.round(vol);
  
     const grupos = {};
-    records.forEach(r=>{grupos[r.grupo]=(grupos[r.grupo]||0)+(r.peso*r.reps*r.series)});
-    const prCount = [...new Set(records.map(r=>r.nombre))].filter(n=>records.some(r=>r.nombre===n&&r.peso>0)).length;
+    userRecords.forEach(r=>{grupos[r.grupo]=(grupos[r.grupo]||0)+(r.peso*r.reps*r.series)});
+    const prCount = [...new Set(userRecords.map(r=>r.nombre))].filter(n=>userRecords.some(r=>r.nombre===n&&r.peso>0)).length;
     document.getElementById('s-pr').textContent=prCount;
  
     const bars = document.getElementById('bar-chart');
@@ -339,7 +378,7 @@
       const d = new Date(today - (20-i)*86400000);
       d.setHours(0,0,0,0);
       const next = new Date(d); next.setDate(next.getDate()+1);
-      const count = records.filter(r=>r.ts>=d.getTime()&&r.ts<next.getTime()).length;
+      const count = userRecords.filter(r=>r.ts>=d.getTime()&&r.ts<next.getTime()).length;
       const opacity = count===0 ? 0.08 : Math.min(0.2+count*0.25,1);
       const color = count===0 ? 'var(--border)' : `rgba(227,75,74,${opacity})`;
       return `<div class="day-cell" style="background:${color}" title="${d.toLocaleDateString('es-CO',{day:'2-digit',month:'short'})}: ${count} ejercicios"></div>`;
