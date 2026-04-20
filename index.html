@@ -94,8 +94,9 @@
       <div class="form-group" style="grid-column:1/-1">
         <label>Perfil / Usuario</label>
         <select id="ej-usuario">
-          <option value="Anderson">Anderson</option>
-          <option value="Merly">Merly</option>
+          <option value="Mi Perfil">Mi Perfil</option>
+          <option value="Invitado 1">Invitado 1</option>
+          <option value="Invitado 2">Invitado 2</option>
         </select>
       </div>
 
@@ -195,6 +196,7 @@
     }
   });
 
+  // Al cambiar el usuario, refrescamos historial y estadísticas
   document.getElementById('ej-usuario').addEventListener('change', () => {
     if(document.getElementById('sec-historial').classList.contains('active')) renderHistorial();
     if(document.getElementById('sec-stats').classList.contains('active')) renderStats();
@@ -250,7 +252,7 @@
     btn.textContent = "Enviando a Drive...";
     
     const formData = new FormData();
-    formData.append('usuario', usuario);
+    formData.append('usuario', usuario); // Campo nuevo para Google
     formData.append('ejercicio', nombre);
     formData.append('peso', peso);
     formData.append('reps', reps);
@@ -279,8 +281,6 @@
     document.getElementById('ej-series').value='1';
     document.getElementById('ej-notas').value='';
     setTimeout(()=>{fb.textContent=''},4000);
-    if(document.getElementById('sec-historial').classList.contains('active')) renderHistorial();
-    if(document.getElementById('sec-stats').classList.contains('active')) renderStats();
   }
  
   function getPR(nombre, usuario){
@@ -314,8 +314,11 @@
     const list = document.getElementById('log-list');
     const usuarioActual = document.getElementById('ej-usuario').value;
     
+    // Filtramos primero por usuario activo y luego por grupo muscular
     let data = records.filter(r => r.usuario === usuarioActual);
-    if(filtroActivo !== 'Todos') data = data.filter(r => r.grupo === filtroActivo);
+    if(filtroActivo !== 'Todos') {
+      data = data.filter(r => r.grupo === filtroActivo);
+    }
 
     if(!data.length){list.innerHTML=`<div class="empty">Sin registros para ${usuarioActual}.</div>`;return}
     
@@ -345,8 +348,9 @@
     const usuarioActual = document.getElementById('ej-usuario').value;
     const userRecords = records.filter(r => r.usuario === usuarioActual);
 
-    document.getElementById('s-total').textContent=userRecords.length;
+    const total = userRecords.length;
     const vol = userRecords.reduce((a,r)=>a+(r.peso*r.reps*r.series),0);
+    document.getElementById('s-total').textContent=total;
     document.getElementById('s-vol').textContent=vol>=1000?(vol/1000).toFixed(1)+'k':Math.round(vol);
  
     const grupos = {};
